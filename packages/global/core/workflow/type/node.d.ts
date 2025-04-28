@@ -56,7 +56,7 @@ export type FlowNodeCommonType = {
   pluginData?: PluginDataType;
 
   // tool data
-  toolData?: NodeToolConfigType;
+  toolConfig?: NodeToolConfigType;
 };
 
 export type PluginDataType = {
