@@ -1,18 +1,20 @@
-import { postUploadImg, postUploadFiles } from '@/web/common/file/api';
+import {
+  postUploadImg,
+  postUploadFiles,
+  postS3PresignedUpload,
+  postS3UploadFile
+} from '@/web/common/file/api';
 import { UploadImgProps } from '@fastgpt/global/common/file/api';
 import { BucketNameEnum } from '@fastgpt/global/common/file/constants';
 import { preUploadImgProps } from '@fastgpt/global/common/file/api';
 import { compressBase64Img, type CompressImgProps } from '@fastgpt/web/common/file/img';
 import type { UploadChatFileProps, UploadDatasetFileProps } from '@/pages/api/common/file/upload';
 
-/**
- * upload file to mongo gridfs
- */
-export const uploadFile2DB = ({
+async function legacyUpload({
   file,
   bucketName,
   data,
-  metadata = {},
+  metadata,
   percentListen
 }: {
   file: File;
@@ -20,7 +22,7 @@ export const uploadFile2DB = ({
   data: UploadChatFileProps | UploadDatasetFileProps;
   metadata?: Record<string, any>;
   percentListen?: (percent: number) => void;
-}) => {
+}) {
   const form = new FormData();
   form.append('metadata', JSON.stringify(metadata));
   form.append('bucketName', bucketName);
@@ -33,6 +35,56 @@ export const uploadFile2DB = ({
     const percent = Math.round((e.loaded / e.total) * 100);
     percentListen?.(percent);
   });
+}
+
+/**
+ * upload file to mongo gridfs
+ */
+export const uploadFile2DB = async ({
+  file,
+  bucketName,
+  data,
+  metadata = {},
+  percentListen
+}: {
+  file: File;
+  bucketName: `${BucketNameEnum}`;
+  data: UploadChatFileProps | UploadDatasetFileProps;
+  metadata?: Record<string, any>;
+  percentListen?: (percent: number) => void;
+}) => {
+  if (bucketName === BucketNameEnum.dataset) {
+    return legacyUpload({ file, bucketName, data, metadata, percentListen });
+  } else if (bucketName === BucketNameEnum.chat) {
+    const { fileId, formData, postURL, previewUrl } = await postS3PresignedUpload({
+      bucketName,
+      fileName: file.name,
+      metadata: JSON.stringify(metadata),
+      data
+    });
+
+    if (previewUrl) {
+      const form = new FormData();
+      for (const [key, value] of Object.entries(formData)) {
+        form.append(key, value);
+      }
+
+      form.append('file', file, encodeURIComponent(file.name));
+
+      await postS3UploadFile(postURL, form, (e) => {
+        if (!e.total) return;
+
+        const percent = Math.round((e.loaded / e.total) * 100);
+        percentListen?.(percent);
+      });
+
+      return Promise.resolve({ fileId, previewUrl });
+    } else {
+      // fallback to legacy upload
+      return legacyUpload({ file, bucketName, data, metadata, percentListen });
+    }
+  }
+  return Promise.resolve({ fileId: '', previewUrl: '' });
 };
 
 /**
