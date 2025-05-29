@@ -26,9 +26,9 @@ export const dispatchRunTool = async (props: RunToolProps): Promise<RunToolRespo
     params,
     node: { avatar, toolConfig }
   } = props;
-  if (toolConfig && toolConfig.systemToolConfig) {
+  if (toolConfig && toolConfig.systemTool) {
     // run system tool
-    const { error, output } = await runTool(toolConfig.systemToolConfig.toolId, params);
+    const { error, output } = await runTool(toolConfig.systemTool.toolId, params);
     if (error) {
       return Promise.reject(error);
     }

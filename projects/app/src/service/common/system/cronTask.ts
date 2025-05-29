@@ -216,9 +216,11 @@ let flushId: string;
 
 export async function checkflushSystemPlugins() {
   const _flushId = await getToolFlushId();
+  addLog.info('checkflushSystemPlugins');
   if (!flushId) flushId = _flushId;
   if (flushId !== _flushId) {
     flushId = _flushId;
+    addLog.info('checkflushSystemPlugins, flushId changed, getSystemPlugins');
     getSystemPlugins(true);
   }
 }

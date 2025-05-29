@@ -29,7 +29,9 @@ export type NodeToolConfigType = {
   mcpTool?: McpToolConfigType & {
     url: string;
   };
-  systemTool?: {};
+  systemTool?: {
+    toolId: string;
+  };
 };
 
 export type FlowNodeCommonType = {
