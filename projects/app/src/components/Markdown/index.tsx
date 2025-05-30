@@ -10,7 +10,7 @@ import RehypeRaw from 'rehype-raw';
 import styles from './index.module.scss';
 import dynamic from 'next/dynamic';
 import { Box } from '@chakra-ui/react';
-import { CodeClassNameEnum, mdTextFormat } from './utils';
+import { CodeClassNameEnum, mdTextFormat, filterSafeProps } from './utils';
 import ErrorBoundary from './errorBoundry';
 import SVGRenderer from './markdowSVG';
 import { useCreation } from 'ahooks';
@@ -37,15 +37,7 @@ const SafeA = (props: any) => {
   const href = props.href || '';
   const safeHref = isSafeHref(href) ? href : '#';
 
-  const ALLOWED_A_ATTRS = new Set([
-    'href',
-    'target',
-    'rel',
-    'className',
-    'children',
-    'style',
-    'title'
-  ]);
+  const ALLOWED_A_ATTRS = new Set(['href']);
   const safeProps = filterSafeProps(props, ALLOWED_A_ATTRS);
 
   return (
@@ -130,30 +122,27 @@ const MarkdownRender = ({
                       node.type = 'text';
                       node.value = `<${node.tagName}`;
                     }
-
-                    // handle properties, filter events
+                    // use filterSafeProps to filter component properties
                     if (node.properties) {
-                      Object.keys(node.properties).forEach((key) => {
-                        const keyLower = key.toLowerCase();
-                        // if event property (on开头)
-                        if (keyLower.startsWith('on')) {
-                          const value = node.properties[key];
-                          // if event value is not a function or contains suspicious content, delete the event
-                          if (
-                            typeof value === 'string' || // delete event handler in string format
-                            value === null ||
-                            value === undefined ||
-                            (typeof value === 'string' &&
-                              (value.includes('javascript:') ||
-                                value.includes('alert') ||
-                                value.includes('eval') ||
-                                value.includes('Function') ||
-                                /[\(\)\[\]\{\}]/.test(value))) // flag for executable code containing parentheses, etc.
-                          ) {
-                            delete node.properties[key];
-                          }
-                        }
-                      });
+                      const ALLOWED_ATTRS = new Set([
+                        'title',
+                        'alt',
+                        'src',
+                        'href',
+                        'target',
+                        'rel',
+                        'width',
+                        'height',
+                        'align',
+                        'valign',
+                        'type',
+                        'lang',
+                        'value',
+                        'name'
+                      ]);
+
+                      // use filterSafeProps to filter properties
+                      node.properties = filterSafeProps(node.properties, ALLOWED_ATTRS);
                     }
                   }
 
@@ -252,6 +241,11 @@ function sanitizeImageSrc(src?: string): string | undefined {
     return trimmed;
   }
   return undefined;
+}
+
+function Image({ src }: { src?: string }) {
+  const safeSrc = sanitizeImageSrc(src);
+  return <MdImage src={safeSrc} />;
 }
 
 const ALLOWED_IMG_ATTRS = new Set([
