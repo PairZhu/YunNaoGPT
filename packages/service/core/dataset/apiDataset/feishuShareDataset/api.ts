@@ -2,11 +2,11 @@ import type {
   APIFileItem,
   ApiFileReadContentResponse,
   ApiDatasetDetailResponse,
-  FeishuServer
+  FeishuShareServer
 } from '@fastgpt/global/core/dataset/apiDataset';
 import { type ParentIdType } from '@fastgpt/global/common/parentFolder/type';
 import axios, { type Method } from 'axios';
-import { addLog } from '../../../common/system/log';
+import { addLog } from '../../../../common/system/log';
 
 type ResponseDataType = {
   success: boolean;
@@ -24,6 +24,10 @@ type FeishuFileListResponse = {
     created_time: number;
     url: string;
     owner_id: string;
+    shortcut_info?: {
+      target_token: string;
+      target_type: string;
+    };
   }[];
   has_more: boolean;
   next_page_token: string;
@@ -31,7 +35,11 @@ type FeishuFileListResponse = {
 
 const feishuBaseUrl = process.env.FEISHU_BASE_URL || 'https://open.feishu.cn';
 
-export const useFeishuDatasetRequest = ({ feishuServer }: { feishuServer: FeishuServer }) => {
+export const useFeishuShareDatasetRequest = ({
+  feishuShareServer
+}: {
+  feishuShareServer: FeishuShareServer;
+}) => {
   const instance = axios.create({
     baseURL: feishuBaseUrl,
     timeout: 60000
@@ -40,15 +48,7 @@ export const useFeishuDatasetRequest = ({ feishuServer }: { feishuServer: Feishu
   // 添加请求拦截器
   instance.interceptors.request.use(async (config) => {
     if (!config.headers.Authorization) {
-      const { data } = await axios.post<{ tenant_access_token: string }>(
-        `${feishuBaseUrl}/open-apis/auth/v3/tenant_access_token/internal`,
-        {
-          app_id: feishuServer.appId,
-          app_secret: feishuServer.appSecret
-        }
-      );
-
-      config.headers['Authorization'] = `Bearer ${data.tenant_access_token}`;
+      config.headers['Authorization'] = `Bearer ${feishuShareServer.user_access_token}`;
       config.headers['Content-Type'] = 'application/json; charset=utf-8';
     }
     return config;
@@ -109,7 +109,7 @@ export const useFeishuDatasetRequest = ({ feishuServer }: { feishuServer: Feishu
       const data = await request<FeishuFileListResponse>(
         `/open-apis/drive/v1/files`,
         {
-          folder_token: parentId || feishuServer.folderToken,
+          folder_token: parentId || feishuShareServer.folderToken,
           page_size: 200,
           page_token: pageToken
         },
@@ -127,10 +127,18 @@ export const useFeishuDatasetRequest = ({ feishuServer }: { feishuServer: Feishu
     const allFiles = await fetchFiles();
 
     return allFiles
-      .filter((file) => ['folder', 'docx'].includes(file.type))
+      .filter((file) => {
+        if (file.type === 'shortcut') {
+          return (
+            file.shortcut_info?.target_type === 'docx' ||
+            file.shortcut_info?.target_type === 'folder'
+          );
+        }
+        return file.type === 'folder' || file.type === 'docx';
+      })
       .map((file) => ({
-        id: file.token,
-        parentId: file.parent_token,
+        id: file.type === 'shortcut' ? file.shortcut_info!.target_token : file.token,
+        parentId: parentId,
         name: file.name,
         type: file.type === 'folder' ? ('folder' as const) : ('file' as const),
         hasChild: file.type === 'folder',
@@ -144,17 +152,10 @@ export const useFeishuDatasetRequest = ({ feishuServer }: { feishuServer: Feishu
   }: {
     apiFileId: string;
   }): Promise<ApiFileReadContentResponse> => {
+    const fileId = apiFileId.split('-')[1];
     const [{ content }, { document }] = await Promise.all([
-      request<{ content: string }>(
-        `/open-apis/docx/v1/documents/${apiFileId}/raw_content`,
-        {},
-        'GET'
-      ),
-      request<{ document: { title: string } }>(
-        `/open-apis/docx/v1/documents/${apiFileId}`,
-        {},
-        'GET'
-      )
+      request<{ content: string }>(`/open-apis/docx/v1/documents/${fileId}/raw_content`, {}, 'GET'),
+      request<{ document: { title: string } }>(`/open-apis/docx/v1/documents/${fileId}`, {}, 'GET')
     ]);
 
     return {
@@ -164,12 +165,13 @@ export const useFeishuDatasetRequest = ({ feishuServer }: { feishuServer: Feishu
   };
 
   const getFilePreviewUrl = async ({ apiFileId }: { apiFileId: string }): Promise<string> => {
+    const fileId = apiFileId.split('-')[1];
     const { metas } = await request<{ metas: { url: string }[] }>(
       `/open-apis/drive/v1/metas/batch_query`,
       {
         request_docs: [
           {
-            doc_token: apiFileId,
+            doc_token: fileId,
             doc_type: 'docx'
           }
         ],
