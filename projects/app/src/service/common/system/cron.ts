@@ -5,7 +5,8 @@ import {
   checkInvalidDatasetFiles,
   checkInvalidDatasetData,
   checkInvalidVector,
-  removeExpiredChatFiles
+  removeExpiredChatFiles,
+  checkflushSystemPlugins
 } from './cronTask';
 import { checkTimerLock } from '@fastgpt/service/common/system/timerLock/utils';
 import { TimerIdEnum } from '@fastgpt/service/common/system/timerLock/constants';
@@ -79,10 +80,15 @@ const scheduleTriggerAppCron = () => {
   });
 };
 
+const setCheckFlushSystemPluginsCron = () => {
+  setCron('0 */5 * * *', checkflushSystemPlugins);
+};
+
 export const startCron = () => {
   setTrainingQueueCron();
   setClearTmpUploadFilesCron();
   clearInvalidDataCron();
   scheduleTriggerAppCron();
   clearExpiredRawTextBufferCron();
+  setCheckFlushSystemPluginsCron();
 };

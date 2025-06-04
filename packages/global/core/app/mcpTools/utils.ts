@@ -1,12 +1,12 @@
+import { nanoid } from 'nanoid';
+import { i18nT } from '../../../../web/i18n/utils';
 import { NodeOutputKeyEnum, WorkflowIOValueTypeEnum } from '../../workflow/constants';
 import {
   FlowNodeInputTypeEnum,
   FlowNodeOutputTypeEnum,
   FlowNodeTypeEnum
 } from '../../workflow/node/constant';
-import { nanoid } from 'nanoid';
 import { type McpToolConfigType } from '../type';
-import { i18nT } from '../../../../web/i18n/utils';
 import { type RuntimeNodeItemType } from '../../workflow/runtime/type';
 
 export const getMCPToolSetRuntimeNode = ({
