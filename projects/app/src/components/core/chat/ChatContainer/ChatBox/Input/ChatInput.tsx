@@ -89,6 +89,43 @@ const ChatInput = ({
   const havInput = !!inputValue || fileList.length > 0;
   const canSendMessage = havInput && !hasFileUploading;
 
+  const textAreaOnChange = (textarea: HTMLTextAreaElement) => {
+    textarea.style.height = textareaMinH;
+    const maxHeight = 128;
+    const newHeight = Math.min(textarea.scrollHeight, maxHeight);
+    textarea.style.height = `${newHeight}px`;
+
+    // Only show scrollbar when content exceeds max height
+    if (textarea.scrollHeight > maxHeight) {
+      textarea.style.overflowY = 'auto';
+    } else {
+      textarea.style.overflowY = 'hidden';
+    }
+
+    setValue('input', textarea.value);
+  };
+
+  window.addEventListener('message', function (event) {
+    // 1. 验证消息来源
+    /*   const allowedOrigin = 'http://192.168.1.60:18092';
+    if (event.origin !== allowedOrigin) return; */
+    // 2. 获取传递的数据
+    const receivedData = event.data;
+    if (typeof receivedData != 'string') {
+      return;
+    }
+    // 3. 在页面上显示消息
+    if (receivedData) {
+      // 手动触发onChange事件
+      const textarea = TextareaDom.current;
+      if (textarea) {
+        console.log('传入文本:', receivedData);
+        textarea.value = receivedData;
+        textAreaOnChange(textarea);
+      }
+    }
+  });
+
   // Upload files
   useRequest2(uploadFiles, {
     manual: false,
@@ -151,22 +188,7 @@ const ChatInput = ({
               fontSize: 'sm'
             }}
             value={inputValue}
-            onChange={(e) => {
-              const textarea = e.target;
-              textarea.style.height = textareaMinH;
-              const maxHeight = 128;
-              const newHeight = Math.min(textarea.scrollHeight, maxHeight);
-              textarea.style.height = `${newHeight}px`;
-
-              // Only show scrollbar when content exceeds max height
-              if (textarea.scrollHeight > maxHeight) {
-                textarea.style.overflowY = 'auto';
-              } else {
-                textarea.style.overflowY = 'hidden';
-              }
-
-              setValue('input', textarea.value);
-            }}
+            onChange={(e) => textAreaOnChange(e.target)}
             onKeyDown={(e) => {
               // enter send.(pc or iframe && enter and unPress shift)
               const isEnter = e.key === 'Enter';
